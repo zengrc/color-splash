@@ -1,7 +1,10 @@
 <template>
   <div id="app">
     <div id="color-splash"></div>
-    <input id="select-photo" type="file" accept="image/*" @change="selectImage" />
+    <div class="btn">
+      选择图片
+      <input id="select-photo" type="file" accept="image/*" @change="selectImage" />
+    </div>
   </div>
 </template>
 
@@ -55,6 +58,7 @@ export default defineComponent({
 body {
   margin: auto;
   position: relative;
+  background: black;
 }
 
 #app, #color-splash {
@@ -63,12 +67,27 @@ body {
   position: relative;
 }
 
+.btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 200px;
+  height: 48px;
+  border: solid 1px rgb(255, 85, 0);
+  background: linear-gradient(lightcoral, lightsalmon);
+  border-radius: 18px;
+  color: rgb(52, 40, 40);
+  font-size: 32px;
+  line-height: 48px;
+  text-align: center;
+}
+
 #select-photo {
-  opacity: 0;
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  opacity: 0;
 }
 </style>
