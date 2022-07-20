@@ -1,21 +1,33 @@
 <template>
   <div id="app">
     <div id="color-splash"></div>
-    <div class="btn">
-      选择图片
-      <input id="select-photo" type="file" accept="image/*" @change="selectImage" />
+    <div class="btn-list">
+      <div class="btn">
+        选择图片
+        <input id="select-photo" type="file" accept="image/*" @change="selectImage" />
+      </div>
+      <div class="btn" @click="switchMode(SPLASH_MODE.COLOR)">
+        涂色
+      </div>
+      <div class="btn" @click="switchMode(SPLASH_MODE.GRAY)">
+        涂灰
+      </div>
+      <div class="btn" @click="switchMode(SPLASH_MODE.MOVE)">
+        移动图片
+      </div>
     </div>
+    <div id="splash-preview"></div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted } from 'vue';
-import splashInit, { Splash } from './utils/splash';
+import { defineComponent, onMounted, ref } from 'vue';
+import splashInit, { Splash, SPLASH_MODE } from './utils/splash';
 
 export default defineComponent({
   name: 'App',
   setup() {
-    let splash: Splash | undefined = undefined;
+    const splash = ref<Splash>();
 
     const selectImage = (e: Event) => {
       if (!splash) {
@@ -30,7 +42,8 @@ export default defineComponent({
           if (ev.target && ev.target.result) {
             const img = new Image();
             img.onload = () => {
-              splash?.reset(img);
+              splash.value?.reset(img);
+              switchMode(SPLASH_MODE.MOVE);
             }
             img.src = ev.target.result as string;
           }
@@ -40,15 +53,23 @@ export default defineComponent({
       }
     };
 
+    const switchMode = (mode: SPLASH_MODE) => {
+      splash.value?.switch(mode);
+    };
+
     onMounted(() => {
       const divContainer = window.document.querySelector('#color-splash');
-      if (divContainer) {
-        splash = splashInit({ elm: divContainer })
+      const previewContainer = window.document.querySelector('#splash-preview');
+      if (divContainer && previewContainer) {
+        splash.value = splashInit({ elm: divContainer, previewElm: previewContainer })
       }
     });
 
     return {
-      selectImage
+      selectImage,
+      splash,
+      switchMode,
+      SPLASH_MODE
     }
   }
 });
@@ -60,6 +81,9 @@ body {
   position: relative;
   background: black;
 }
+</style>
+
+<style lang="scss" scoped>
 
 #app, #color-splash {
   width: 100%;
@@ -67,10 +91,17 @@ body {
   position: relative;
 }
 
-.btn {
+.btn-list {
   position: absolute;
   top: 20px;
   left: 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  flex-shrink: 0;
   width: 200px;
   height: 48px;
   border: solid 1px rgb(255, 85, 0);
@@ -80,6 +111,9 @@ body {
   font-size: 32px;
   line-height: 48px;
   text-align: center;
+  margin: 10px 10px;
+  overflow: hidden;
+  position: relative;
 }
 
 #select-photo {
@@ -89,5 +123,13 @@ body {
   width: 100%;
   height: 100%;
   opacity: 0;
+}
+
+#splash-preview {
+  position: absolute;
+  bottom: 50px;
+  right: 50px;
+  width: 200px;
+  height: 300px;
 }
 </style>

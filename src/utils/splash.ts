@@ -1,12 +1,23 @@
 import registerTouch from './touch';
+import './splash.css';
 
 export interface SplashOptions {
   elm?: Element,
+  previewElm?: Element
 }
 
 export interface Splash {
   reset: (src: HTMLImageElement) => void,
-  move: (x: number, y: number) => void
+  move: (x: number, y: number, offsetX: number, offsetY: number) => void,
+  destroy: () => void,
+  SPLASH_MODE: typeof SPLASH_MODE,
+  switch: (m: SPLASH_MODE) => void
+}
+
+export enum SPLASH_MODE {
+  MOVE,
+  COLOR,
+  GRAY
 }
 
 const webgl = window.document.createElement('canvas').getContext('webgl');
@@ -156,9 +167,10 @@ const setUniformVec4 = (gl: WebGLRenderingContext, program: WebGLProgram, unifor
   gl.uniform4f(uniformLocation, x, y, z, w);
 };
 
-const initWebgl = (canvas: HTMLCanvasElement) => {
+const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement): Splash | undefined => {
   const gl = canvas.getContext('webgl');
   if (!gl) return;
+  let mode = SPLASH_MODE.MOVE;
   const program = createProgram(gl, vertextSource, fragmentSource);
   const pickProgram = createProgram(gl, pickVertextSource, pickFragmentSource); // 判断点击时是否击中图片
   const frameBuffer = createFrameBuffer(gl);
@@ -180,7 +192,7 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
   // 
   gl.useProgram(pickProgram);
   setUniformMat(gl, pickProgram, projectionMat, 'u_projection');
-  const u_id = [
+  const u_id = [ // 将1拆分成4个部分，每部分8个字节，最大值是255，同时除255(0xff)，归一化，因为webgl绘制的时候颜色范围是0-1
     ((1 >>  0) & 0xFF) / 0xFF,
     ((1 >>  8) & 0xFF) / 0xFF,
     ((1 >> 16) & 0xFF) / 0xFF,
@@ -261,10 +273,29 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
     updateDraw();
   };
 
-  const move = (diffX: number, diffY: number) => {
-    translate.x += diffX;
-    translate.y += diffY;
-    updateDraw();
+  const move = (diffX: number, diffY: number, offsetX: number, offsetY: number) => {
+    if (mode === SPLASH_MODE.MOVE) {
+      translate.x += diffX;
+      translate.y += diffY;
+      updateDraw();
+    } else {
+      updateDraw();
+      previewPortion({ x: offsetX, y: offsetY });
+    }
+  };
+
+  const previewPortion = (center?: { x: number, y: number }) => {
+    const previewCTX = previewCanvas.getContext('2d');
+    if (!previewCTX) return;
+    const data = new Uint8ClampedArray(previewCTX.canvas.width * previewCTX.canvas.height * 4);
+    const centerX = center ? center.x : translate.x;
+    const centerY = center ? center.y : translate.y;
+    const left = centerX - previewCTX.canvas.width / 2;
+    const bottom = centerY + previewCTX.canvas.height / 2;
+    gl.readPixels(left, gl.canvas.height - bottom, previewCTX.canvas.width, previewCTX.canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    const imageData = previewCTX.createImageData(previewCTX.canvas.width, previewCTX.canvas.height);
+    imageData.data.set(data);
+    previewCTX.putImageData(imageData, 0, 0);
   };
 
   const { unregister } = registerTouch(canvas, ({ offsetX, offsetY }) => {
@@ -276,18 +307,38 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
     gl.useProgram(program);
     if (id === 1) return true;
     return false;
-  }, ({ diffX, diffY }) => {
-    move(diffX, diffY);
+  }, ({ diffX, diffY, offsetX, offsetY }) => {
+    move(diffX, diffY, offsetX, offsetY);
   });
 
   const destroy = () => {
     unregister();
   };
 
+  const switchMode = (m: SPLASH_MODE) => {
+    mode = m;
+    const previewParent = previewCanvas.parentElement;
+    if (m !== SPLASH_MODE.MOVE) {
+      if (previewParent) {
+        previewParent.style.opacity = '1';
+        previewParent.style.pointerEvents = 'none';
+        updateDraw();
+        previewPortion();
+      }
+    } else {
+      if (previewParent) {
+        previewParent.style.opacity = '0';
+        previewParent.style.pointerEvents = 'none';
+      }
+    }
+  };
+
   return {
     reset: resetImage,
     move,
-    destroy
+    destroy,
+    switch: switchMode,
+    SPLASH_MODE
   };
 }
 
@@ -297,5 +348,25 @@ export default function init (opt: SplashOptions): Splash | undefined {
   canvas.width = container.clientWidth;
   canvas.height = container.clientHeight;
   container.append(canvas);
-  return initWebgl(canvas);
+  // preview container
+  let previewContainer: Element;
+  const previewCanvas = window.document.createElement('canvas');
+  previewCanvas.classList.add('_splash-preview-canvas');
+  if (opt.previewElm) {
+    previewContainer = opt.previewElm;
+    previewCanvas.width = previewContainer.clientWidth;
+    previewCanvas.height = previewContainer.clientHeight;
+  }
+  else {
+    previewContainer = window.document.createElement('div');
+    previewContainer.classList.add('_splash-preview-container');
+    window.document.body.append(previewContainer);
+    setTimeout(() => { // append之后，要获取到真实的宽高，需要等一段时间
+      previewCanvas.width = previewContainer.clientWidth;
+      previewCanvas.height = previewContainer.clientHeight;
+    }, 20);
+  }
+  previewContainer.append(previewCanvas);
+
+  return initWebgl(canvas, previewCanvas);
 }
