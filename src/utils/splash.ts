@@ -180,7 +180,13 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
   // 
   gl.useProgram(pickProgram);
   setUniformMat(gl, pickProgram, projectionMat, 'u_projection');
-  setUniformVec4(gl, pickProgram, 'u_id', 0, 0, 0, 1);
+  const u_id = [
+    ((1 >>  0) & 0xFF) / 0xFF,
+    ((1 >>  8) & 0xFF) / 0xFF,
+    ((1 >> 16) & 0xFF) / 0xFF,
+    ((1 >> 24) & 0xFF) / 0xFF,
+  ];
+  setUniformVec4(gl, pickProgram, 'u_id', u_id[0], u_id[1], u_id[2], u_id[3]);
 
   const size = {
     width: 0,
@@ -193,7 +199,6 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
   let rotate = 0;
   const updateDraw = () => {
     gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
     // 绘制时，让图片中心与canvas左上角重叠
     const left =  -size.width / 2;
     const right = size.width / 2;
@@ -215,6 +220,7 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
     setAttribute(gl, pickProgram, aPosData, "a_position", gl.DYNAMIC_DRAW);
     // 通过bindFramebuffer声明接下来绘制将发生在buffer上
     gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     // bindFramebuffer绑定null，则绘制在canvas上
     gl.useProgram(program);
@@ -222,16 +228,17 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
     setUniformMat(gl, program, createTranslateMat(translate.x, translate.y), 'u_translate');
     setAttribute(gl, program, aPosData, "a_position", gl.DYNAMIC_DRAW);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
 
   const resetImage = (source: HTMLImageElement) => {
     // 创建一个纹理
+    gl.useProgram(program);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     const texture = gl.createTexture();
     if (!texture) return;
     // 绑定纹理到当前操作对象
-    gl.useProgram(program);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     // 纹理属性设置
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -261,8 +268,14 @@ const initWebgl = (canvas: HTMLCanvasElement) => {
   };
 
   const { unregister } = registerTouch(canvas, ({ offsetX, offsetY }) => {
-    
-    return !!offsetX && !!offsetY;
+    updateDraw();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+    const pixel = new Uint8Array(4);
+    gl.readPixels(offsetX, gl.canvas.height - offsetY, 1 , 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    const id = pixel[0] + (pixel[1] << 8) + (pixel[2] << 16) + (pixel[3] << 24);
+    gl.useProgram(program);
+    if (id === 1) return true;
+    return false;
   }, ({ diffX, diffY }) => {
     move(diffX, diffY);
   });
