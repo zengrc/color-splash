@@ -33,24 +33,16 @@ export const fragmentSource = `
 export const splashVertextSource = `
   attribute vec2 a_position;
   uniform mat4 u_projection;
-  uniform mat4 u_translate;
-  attribute vec2 a_texCoord;
-  varying vec2 v_texCoord;
   void main(void) {
-    gl_Position = u_projection * u_translate * vec4(a_position, 0, 1.0);
-    v_texCoord = a_texCoord;
+    gl_Position = u_projection * vec4(a_position, 0, 1.0);
   }
 `;
 
 export const splashFragmentSource = `
   precision mediump float;
-  varying vec2 v_texCoord;
-  uniform sampler2D u_image;
 
   void main() {
-    vec4 texture = texture2D(u_image, v_texCoord);
-    float lumi = 0.299 * texture.r + 0.587 * texture.g + 0.114 * texture.b;
-    gl_FragColor = vec4(lumi, lumi, lumi, 1);
+    gl_FragColor = vec4(1, 1, 1, 1);
   }
 `;
 

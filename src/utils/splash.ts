@@ -46,9 +46,10 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   const pickProgram = WEBGL.createProgram(gl, pickVertextSource, pickFragmentSource); // 判断点击时是否击中图片
   const patchProgram = WEBGL.createProgram(gl, splashVertextSource, splashFragmentSource); // 灰度或彩色化像素
   const frameBuffer = WEBGL.createFrameBuffer(gl);
+  let patchBuffer: WebGLBuffer | null;
+  let patchTexture: WebGLTexture | null;
   const picTexture = WEBGL.createTexture(gl);
-  const patchTexture = WEBGL.createTexture(gl);
-  if (!program || !pickProgram || !frameBuffer || !patchProgram || !picTexture || !patchTexture) return;
+  if (!program || !pickProgram || !frameBuffer || !patchProgram || !picTexture) return;
   // 设置不变的矩阵
   // 纹理坐标，原点在图片左下角
   // 由于采用TRIANGLE_STRIP绘图，坐标需要是Z字形排列
@@ -64,18 +65,12 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   WEBGL.setAttribute(gl, program, aTexCoord, 'a_texCoord', gl.STATIC_DRAW);
   WEBGL.setUniformMat(gl, program, projectionMat, 'u_projection');
   // 不变的变量
-  gl.useProgram(patchProgram);
-  WEBGL.setAttribute(gl, patchProgram, aTexCoord, 'a_texCoord', gl.STATIC_DRAW);
-  WEBGL.setUniformMat(gl, patchProgram, projectionMat, 'u_projection');
-  // 不变的变量
   gl.useProgram(pickProgram);
   WEBGL.setUniformMat(gl, pickProgram, projectionMat, 'u_projection');
   const uid = WEBGL.getObjUid(1);
   WEBGL.setUniformVec4(gl, pickProgram, 'u_id', uid);
 
   const updateDraw = () => {
-    gl.bindTexture(gl.TEXTURE_2D, picTexture);
-    gl.clearColor(0, 0, 0, 0);
     // 绘制时，让图片中心与canvas左上角重叠
     const left =  -size.width / 2;
     const right = size.width / 2;
@@ -90,29 +85,19 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     const roateMat = WEBGL.createRotateMat(rotate);
     const translateMat = WEBGL.createTranslateMat(translate.x, translate.y);
     // 绘制两次，一次在framebuffer上，一次在canvas上，保持两者变换一致
-    gl.useProgram(pickProgram)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
-    // 旋转
-    WEBGL.setUniformMat(gl, pickProgram, roateMat, 'u_rotate');
-    // 平移
-    WEBGL.setUniformMat(gl, pickProgram, translateMat, 'u_translate');
-    // 坐标
-    WEBGL.setAttribute(gl, pickProgram, aPosData, "a_position", gl.DYNAMIC_DRAW);
-    // 通过bindFramebuffer声明接下来绘制将发生在buffer上
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    // bindFramebuffer绑定null，则绘制在canvas上
-    gl.useProgram(program);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    WEBGL.setUniformMat(gl, program, roateMat, 'u_rotate');
-    WEBGL.setUniformMat(gl, program, translateMat, 'u_translate');
-    WEBGL.setAttribute(gl, program, aPosData, "a_position", gl.DYNAMIC_DRAW);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    WEBGL.DrawCube(
+      gl, pickProgram, frameBuffer,
+      [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
+      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
+    );
+    WEBGL.DrawCube(
+      gl, program, null,
+      [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
+      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
+    );
   };
 
   const resetImage = (source: HTMLImageElement) => {
-    WEBGL.setTextureFromImage(gl, program, picTexture, 'u_image', source);
     const ratioW = gl.canvas.width / source.width;
     const ratioH = gl.canvas.height / source.height;
     const ratio = Math.min(ratioW, ratioH);
@@ -121,6 +106,9 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     translate.x = gl.canvas.width / 2;
     translate.y = gl.canvas.height / 2;
     rotate = 0;
+    patchTexture = WEBGL.createTexture(gl, null, size.width, size.height);
+    patchBuffer = WEBGL.createFrameBuffer(gl, patchTexture);
+    WEBGL.setTexture(gl, program, picTexture, 'u_image', 0, source);
     updateDraw();
   };
 
@@ -137,27 +125,26 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   };
 
   const patchDraw = (point: {x: number, y: number}) => {
-    gl.useProgram(patchProgram);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    const rLeft = point.x - splashSize;
-    const rBottom = point.y + splashSize;
-    const size = splashSize * 2;
-    const data = new Uint8ClampedArray(size * size * 4);
-    gl.readPixels(rLeft, gl.canvas.height - rBottom, size, size, gl.RGBA, gl.UNSIGNED_BYTE, data);
-    WEBGL.setTextureFromData(gl, patchProgram, patchTexture, 'u_image', size, size, data);
-    const left =  -splashSize;
-    const right = splashSize;
-    const top = -splashSize;
-    const bottom = splashSize;
+    const projMat = WEBGL.createProjectionMat(0, size.width, 0, size.height);
+    const sizeLeft = translate.x - size.width / 2;
+    const sizeTop = translate.y - size.height / 2;
+    const relateX = point.x - sizeLeft;
+    const relateY = point.y - sizeTop;
+    const left = relateX - splashSize;
+    const top = relateY - splashSize;
+    const bottom = relateY + splashSize;
+    const right = relateX + splashSize;
     const aPosData = [
-      left, bottom,
-      right, bottom,
       left, top,
       right, top,
+      left, bottom,
+      right, bottom,
     ];
-    WEBGL.setUniformMat(gl, patchProgram, WEBGL.createTranslateMat(point.x, point.y), 'u_translate');
-    WEBGL.setAttribute(gl, patchProgram, aPosData, "a_position", gl.DYNAMIC_DRAW);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    WEBGL.DrawCube(
+      gl, patchProgram, patchBuffer,
+      [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
+      [{ mat: projMat, name: 'u_projection' }],
+    );
   }
 
   const previewPortion = (center?: { x: number, y: number }) => {
@@ -176,10 +163,10 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
 
   const { unregister } = registerTouch(canvas, ({ offsetX, offsetY }) => {
     updateDraw();
+    gl.useProgram(pickProgram)
     gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
     const pixel = new Uint8Array(4);
     gl.readPixels(offsetX, gl.canvas.height - offsetY, 1 , 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-    gl.useProgram(program);
     return WEBGL.isObjUidMatch(1, pixel);
   }, ({ diffX, diffY, offsetX, offsetY }) => {
     move(diffX, diffY, offsetX, offsetY);
