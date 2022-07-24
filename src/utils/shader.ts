@@ -24,9 +24,18 @@ export const fragmentSource = `
   precision mediump float;
   varying vec2 v_texCoord;
   uniform sampler2D u_image;
+  uniform sampler2D u_image_patch;
 
   void main() {
-    gl_FragColor = texture2D(u_image, v_texCoord);
+    vec4 texture = texture2D(u_image, v_texCoord);
+    vec4 patch = texture2D(u_image_patch, v_texCoord);
+    bool flag = true;
+    if (patch.r > 0.0) {
+      float gray = 0.299 * texture.r + 0.587 * texture.g + 0.114 * texture.b;
+      gl_FragColor = vec4(gray, gray, gray, texture.a);
+    } else {
+      gl_FragColor = texture;
+    }
   }
 `;
 

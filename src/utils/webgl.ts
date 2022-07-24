@@ -165,7 +165,13 @@ export const DrawCube = (
   frameBuffer: WebGLFramebuffer | null,
   attributes: { mat: number[], name: string, drawType: number }[],
   uniforms?: { mat: number[], name: string }[],
+  width?: number,
+  height?: number,
+  keep?: boolean
 ) => {
+  const w = width || gl.canvas.width;
+  const h = height || gl.canvas.height;
+  gl.viewport(0, 0, w, h);
   gl.useProgram(program),
   // 通过bindFramebuffer声明接下来绘制将发生在buffer上
   // bindFramebuffer绑定null，则绘制在canvas上
@@ -178,8 +184,10 @@ export const DrawCube = (
   attributes.forEach(attribute => {
     setAttribute(gl, program, attribute.mat, attribute.name, attribute.drawType);
   });
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  if (!keep) {
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   if (frameBuffer) gl.bindFramebuffer(gl.FRAMEBUFFER, null); // 将当前绘制空间重新指定为canvas
 }

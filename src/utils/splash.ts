@@ -39,7 +39,7 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     y: 0
   };
   let rotate = 0;
-  const splashSize = 20;
+  const splashSize = 5;
   let mode = SPLASH_MODE.MOVE;
   // 创建webgl program
   const program = WEBGL.createProgram(gl, vertextSource, fragmentSource);
@@ -109,6 +109,7 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     patchTexture = WEBGL.createTexture(gl, null, size.width, size.height);
     patchBuffer = WEBGL.createFrameBuffer(gl, patchTexture);
     WEBGL.setTexture(gl, program, picTexture, 'u_image', 0, source);
+    WEBGL.setTexture(gl, program, patchTexture, 'u_image_patch', 1);
     updateDraw();
   };
 
@@ -129,21 +130,23 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     const sizeLeft = translate.x - size.width / 2;
     const sizeTop = translate.y - size.height / 2;
     const relateX = point.x - sizeLeft;
-    const relateY = point.y - sizeTop;
+    const relateY = size.height - point.y + sizeTop;
     const left = relateX - splashSize;
     const top = relateY - splashSize;
     const bottom = relateY + splashSize;
     const right = relateX + splashSize;
     const aPosData = [
-      left, top,
-      right, top,
       left, bottom,
       right, bottom,
+      left, top,
+      right, top,
     ];
     WEBGL.DrawCube(
       gl, patchProgram, patchBuffer,
       [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
       [{ mat: projMat, name: 'u_projection' }],
+      size.width, size.height,
+      true
     );
   }
 
