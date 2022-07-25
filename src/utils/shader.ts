@@ -42,8 +42,11 @@ export const fragmentSource = `
 export const splashVertextSource = `
   attribute vec2 a_position;
   uniform mat4 u_projection;
+  uniform mat4 u_rotate;
+  uniform mat4 u_translate1;
+  uniform mat4 u_translate2;
   void main(void) {
-    gl_Position = u_projection * vec4(a_position, 0, 1.0);
+    gl_Position = u_projection * u_translate2 * u_rotate * u_translate1 * vec4(a_position, 0, 1.0);
   }
 `;
 

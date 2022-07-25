@@ -126,15 +126,19 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   };
 
   const patchDraw = (point: {x: number, y: number}) => {
-    const projMat = WEBGL.createProjectionMat(0, size.width, 0, size.height);
-    const sizeLeft = translate.x - size.width / 2;
-    const sizeTop = translate.y - size.height / 2;
-    const relateX = point.x - sizeLeft;
-    const relateY = size.height - point.y + sizeTop;
-    const left = relateX - splashSize;
-    const top = relateY - splashSize;
-    const bottom = relateY + splashSize;
-    const right = relateX + splashSize;
+    // 由于patchdraw的结果会作为纹理，再下次绘制图片的过程中叠加进去，而纹理和webgl的y轴是相反的，所以投影矩阵，y也得反过来
+    const projMat = WEBGL.createProjectionMat(0, size.width, size.height, 0);
+    // 由于此时的point是在已经做过旋转平移后的图片基础上获取到的point，需要还原之前的操作
+    // 还原1，先平移回原点
+    const translateMat1 = WEBGL.createTranslateMat(-translate.x, -translate.y);
+    // 还原2，旋转回原角度
+    const roateMat = WEBGL.createRotateMat(-rotate);
+    // 还原后，移动图片，让其左上角与canvas重叠
+    const translateMat2 = WEBGL.createTranslateMat(size.width / 2, size.height / 2);
+    const left = point.x - splashSize;
+    const top = point.y - splashSize;
+    const bottom = point.y + splashSize;
+    const right = point.x + splashSize;
     const aPosData = [
       left, bottom,
       right, bottom,
@@ -144,7 +148,12 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     WEBGL.DrawCube(
       gl, patchProgram, patchBuffer,
       [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
-      [{ mat: projMat, name: 'u_projection' }],
+      [
+        { mat: projMat, name: 'u_projection' },
+        { mat: roateMat, name: 'u_rotate' },
+        { mat: translateMat1, name: 'u_translate1' },
+        { mat: translateMat2, name: 'u_translate2' }
+      ],
       size.width, size.height,
       true
     );
