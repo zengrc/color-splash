@@ -52,9 +52,14 @@ export const splashVertextSource = `
 
 export const splashFragmentSource = `
   precision mediump float;
+  uniform int u_mode;
 
   void main() {
-    gl_FragColor = vec4(1, 1, 1, 1);
+    if (u_mode == 1) {
+      gl_FragColor = vec4(1, 1, 1, 1);
+    }else {
+      gl_FragColor = vec4(0, 0, 0, 0);
+    }
   }
 `;
 

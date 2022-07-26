@@ -191,3 +191,10 @@ export const DrawCube = (
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   if (frameBuffer) gl.bindFramebuffer(gl.FRAMEBUFFER, null); // 将当前绘制空间重新指定为canvas
 }
+
+export const clear = (gl: WebGLRenderingContext, frameBuffer: WebGLFramebuffer | null, r: number, g: number, b: number, a: number): void => {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+  gl.clearColor(r, g, b, a);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}

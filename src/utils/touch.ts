@@ -52,7 +52,7 @@ export default function register (canvas: HTMLCanvasElement, checkValid: (param:
     e.preventDefault()
     if (curTouch) {
       const touch0 = e.touches[0];
-      const touch1 = e.touches[1];
+      // const touch1 = e.touches[1];
       if (touchType === TOUCH_TYPE.SINGLE_TOUCH && touch0) {
         const diffX = touch0.clientX - curTouch[0].x;
         const diffY = touch0.clientY - curTouch[0].y;

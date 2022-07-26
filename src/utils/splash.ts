@@ -6,6 +6,10 @@ import {
   splashVertextSource, splashFragmentSource
 } from './shader';
 import * as WEBGL from './webgl';
+import XEvent from './event';
+
+const splashEvent = ['splash-switch'] as const;
+class SplashEvent extends XEvent<typeof splashEvent> {}
 
 export interface SplashOptions {
   elm?: Element,
@@ -17,7 +21,11 @@ export interface Splash {
   move: (x: number, y: number, offsetX: number, offsetY: number) => void,
   destroy: () => void,
   SPLASH_MODE: typeof SPLASH_MODE,
-  switch: (m: SPLASH_MODE) => void
+  switch: (m: SPLASH_MODE) => void,
+  event: {
+    on: SplashEvent['on'],
+    off: SplashEvent['off']
+  }
 }
 
 export enum SPLASH_MODE {
@@ -29,6 +37,7 @@ export enum SPLASH_MODE {
 const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement): Splash | undefined => {
   const gl = canvas.getContext('webgl');
   if (!gl) return;
+  const event = new SplashEvent(splashEvent);
   // 绘制变量
   const size = {
     width: 0,
@@ -46,7 +55,7 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   const pickProgram = WEBGL.createProgram(gl, pickVertextSource, pickFragmentSource); // 判断点击时是否击中图片
   const patchProgram = WEBGL.createProgram(gl, splashVertextSource, splashFragmentSource); // 灰度或彩色化像素
   const frameBuffer = WEBGL.createFrameBuffer(gl);
-  let patchBuffer: WebGLBuffer | null;
+  let patchBuffer: WebGLFramebuffer | null;
   let patchTexture: WebGLTexture | null;
   const picTexture = WEBGL.createTexture(gl);
   if (!program || !pickProgram || !frameBuffer || !patchProgram || !picTexture) return;
@@ -110,7 +119,9 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     patchBuffer = WEBGL.createFrameBuffer(gl, patchTexture);
     WEBGL.setTexture(gl, program, picTexture, 'u_image', 0, source);
     WEBGL.setTexture(gl, program, patchTexture, 'u_image_patch', 1);
-    updateDraw();
+    WEBGL.clear(gl, patchBuffer, 1, 1, 1, 1);
+    switchMode(SPLASH_MODE.COLOR);
+    // updateDraw();
   };
 
   const move = (diffX: number, diffY: number, offsetX: number, offsetY: number) => {
@@ -191,7 +202,17 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   const switchMode = (m: SPLASH_MODE) => {
     mode = m;
     const previewParent = previewCanvas.parentElement;
+    event.emit('splash-switch', mode);
     if (m !== SPLASH_MODE.MOVE) {
+      if (m === SPLASH_MODE.COLOR) {
+        gl.useProgram(patchProgram);
+        const uMode = gl.getUniformLocation(patchProgram, 'u_mode');
+        gl.uniform1i(uMode, 0); // 0相应位置是彩色
+      } else if (m === SPLASH_MODE.GRAY) {
+        gl.useProgram(patchProgram);
+        const uMode = gl.getUniformLocation(patchProgram, 'u_mode');
+        gl.uniform1i(uMode, 1); // 1相应位置是灰色
+      }
       if (previewParent) {
         previewParent.style.opacity = '1';
         previewParent.style.pointerEvents = 'none';
@@ -211,7 +232,8 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     move,
     destroy,
     switch: switchMode,
-    SPLASH_MODE
+    SPLASH_MODE,
+    event: { on: event.on, off: event.off }
   };
 }
 
