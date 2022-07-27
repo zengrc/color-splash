@@ -193,7 +193,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   }
 
   const previewDraw = (center?: { x: number, y: number }) => {
-    const readRatio = 1.2;
+    const readRatio = 1.3;
     const readW = Math.ceil(previewRect.width / readRatio); // 放大1.2倍，所以读取时读小一点
     const readH = Math.ceil(previewRect.height / readRatio); // 放大1.2倍，所以读取时读小一点
     const data = new Uint8ClampedArray(readW * readH * 4);
