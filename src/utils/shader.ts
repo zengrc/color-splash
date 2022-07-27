@@ -81,3 +81,26 @@ export const pickFragmentSource = `
     gl_FragColor = u_id;
   }
 `;
+
+export const previewVertextSource = `
+  attribute vec2 a_position;
+  uniform mat4 u_projection;
+  attribute vec2 a_texCoord;
+  varying vec2 v_texCoord;
+
+  void main(void) {
+    gl_Position = u_projection * vec4(a_position, 0, 1.0);
+    v_texCoord = a_texCoord;
+  }
+`;
+
+export const previewFragmentSource = `
+  precision mediump float;
+  varying vec2 v_texCoord;
+  uniform sampler2D u_image;
+
+  void main() {
+    vec4 texture = texture2D(u_image, v_texCoord);
+    gl_FragColor = texture;
+  }
+`;

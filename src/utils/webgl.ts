@@ -7,18 +7,18 @@ declare global {
   }
 }
 
-export const createProgram = (gl: WebGLRenderingContext, vSource: string, fSource: string): undefined | WebGLProgram => {
+export const createProgram = (gl: WebGLRenderingContext, vSource: string, fSource: string): null | WebGLProgram => {
   // 编译shader
   const vertextShader = gl.createShader(gl.VERTEX_SHADER);
   const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-  if (!vertextShader || !fragmentShader) return;
+  if (!vertextShader || !fragmentShader) return null;
   gl.shaderSource(vertextShader, vSource);
   gl.shaderSource(fragmentShader, fSource);
   gl.compileShader(vertextShader);
   gl.compileShader(fragmentShader);
   // 创建program
   const program = gl.createProgram();
-  if (!program) return;
+  if (!program) return null;
   gl.attachShader(program, vertextShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
@@ -52,9 +52,15 @@ export function createFrameBuffer (gl: WebGLRenderingContext, arg1?: number | We
 export function createTexture (gl: WebGLRenderingContext): WebGLTexture | null
 export function createTexture (gl: WebGLRenderingContext, source: TexImageSource): WebGLTexture | null
 export function createTexture (gl: WebGLRenderingContext, source: ArrayBufferView | null, width: number, height: number): WebGLTexture | null
-export function createTexture (gl: WebGLRenderingContext, source?: TexImageSource | ArrayBufferView | null, width?: number, height?: number ): WebGLTexture | null {
+export function createTexture (gl: WebGLRenderingContext, source?: TexImageSource | ArrayBufferView | null, width?: number, height?: number): WebGLTexture | null {
   const texture = gl.createTexture();
   if (!texture) return null;
+  configTeture(gl, texture, source, width, height);
+
+  return texture;
+}
+
+export function configTeture (gl: WebGLRenderingContext, texture: WebGLTexture | null, source?: TexImageSource | ArrayBufferView | null, width?: number, height?: number): void {
   // 绑定纹理到当前操作对象
   gl.bindTexture(gl.TEXTURE_2D, texture);
   // 纹理属性设置
@@ -68,8 +74,6 @@ export function createTexture (gl: WebGLRenderingContext, source?: TexImageSourc
   } else if (source) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
   }
-
-  return texture;
 }
 
 export function setTexture (gl: WebGLRenderingContext, program: WebGLProgram, texture: WebGLTexture | null, uniform: string, index: number): void
@@ -163,7 +167,7 @@ export const DrawCube = (
   gl: WebGLRenderingContext,
   program: WebGLProgram,
   frameBuffer: WebGLFramebuffer | null,
-  attributes: { mat: number[], name: string, drawType: number }[],
+  attributes?: { mat: number[], name: string, drawType: number }[],
   uniforms?: { mat: number[], name: string }[],
   width?: number,
   height?: number,
@@ -176,12 +180,10 @@ export const DrawCube = (
   // 通过bindFramebuffer声明接下来绘制将发生在buffer上
   // bindFramebuffer绑定null，则绘制在canvas上
   gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
-  if (uniforms) {
-    uniforms.forEach(uniform => {
-      setUniformMat(gl, program, uniform.mat, uniform.name);
-    });
-  }
-  attributes.forEach(attribute => {
+  uniforms?.forEach(uniform => {
+    setUniformMat(gl, program, uniform.mat, uniform.name);
+  });
+  attributes?.forEach(attribute => {
     setAttribute(gl, program, attribute.mat, attribute.name, attribute.drawType);
   });
   if (!keep) {

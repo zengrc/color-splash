@@ -1,9 +1,10 @@
 import registerTouch from './touch';
-import './splash.css';
+// import './splash.css';
 import {
   vertextSource, fragmentSource,
   pickVertextSource, pickFragmentSource,
-  splashVertextSource, splashFragmentSource
+  splashVertextSource, splashFragmentSource,
+  previewVertextSource, previewFragmentSource
 } from './shader';
 import * as WEBGL from './webgl';
 import XEvent from './event';
@@ -34,7 +35,7 @@ export enum SPLASH_MODE {
   GRAY
 }
 
-const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement): Splash | undefined => {
+const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   const gl = canvas.getContext('webgl');
   if (!gl) return;
   const event = new SplashEvent(splashEvent);
@@ -54,11 +55,12 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   const program = WEBGL.createProgram(gl, vertextSource, fragmentSource);
   const pickProgram = WEBGL.createProgram(gl, pickVertextSource, pickFragmentSource); // 判断点击时是否击中图片
   const patchProgram = WEBGL.createProgram(gl, splashVertextSource, splashFragmentSource); // 灰度或彩色化像素
+  const previewProgram = WEBGL.createProgram(gl, previewVertextSource, previewFragmentSource);
   const frameBuffer = WEBGL.createFrameBuffer(gl);
   let patchBuffer: WebGLFramebuffer | null;
   let patchTexture: WebGLTexture | null;
   const picTexture = WEBGL.createTexture(gl);
-  if (!program || !pickProgram || !frameBuffer || !patchProgram || !picTexture) return;
+  if (!program || !pickProgram || !frameBuffer || !patchProgram || !picTexture || !previewProgram) return;
   // 设置不变的矩阵
   // 纹理坐标，原点在图片左下角
   // 由于采用TRIANGLE_STRIP绘图，坐标需要是Z字形排列
@@ -71,13 +73,33 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
   const projectionMat = WEBGL.createProjectionMat(0, gl.canvas.width, 0, gl.canvas.height);
   // 不变的变量
   gl.useProgram(program);
-  WEBGL.setAttribute(gl, program, aTexCoord, 'a_texCoord', gl.STATIC_DRAW);
   WEBGL.setUniformMat(gl, program, projectionMat, 'u_projection');
   // 不变的变量
   gl.useProgram(pickProgram);
   WEBGL.setUniformMat(gl, pickProgram, projectionMat, 'u_projection');
   const uid = WEBGL.getObjUid(1);
   WEBGL.setUniformVec4(gl, pickProgram, 'u_id', uid);
+  // 不变的变量
+  gl.useProgram(previewProgram);
+  WEBGL.setUniformMat(gl, previewProgram, projectionMat, 'u_projection');
+  const scaleUnitW = gl.canvas.width / 5;
+  const scaleUnitH = gl.canvas.height / 5;
+  const previewRect = {
+    left: Math.round(scaleUnitW * 3.2),
+    right: Math.round(scaleUnitW * 4.7),
+    top: Math.round(scaleUnitH * 3.5),
+    bottom: Math.round(scaleUnitH * 4.8),
+    width: 0,
+    height: 0
+  };
+  previewRect.width = previewRect.right - previewRect.left;
+  previewRect.height = previewRect.bottom - previewRect.top;
+  const previewAPosData = [
+    previewRect.left, previewRect.bottom,
+    previewRect.right, previewRect.bottom,
+    previewRect.left, previewRect.top,
+    previewRect.right, previewRect.top,
+  ];
 
   const updateDraw = () => {
     // 绘制时，让图片中心与canvas左上角重叠
@@ -101,7 +123,7 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     );
     WEBGL.DrawCube(
       gl, program, null,
-      [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
+      [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }, { mat: aTexCoord, name: 'a_texCoord', drawType: gl.STATIC_DRAW }],
       [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
     );
   };
@@ -130,9 +152,9 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
       translate.y += diffY;
       updateDraw();
     } else {
-      updateDraw();
       patchDraw({x: offsetX, y: offsetY});
-      previewPortion({ x: offsetX, y: offsetY });
+      updateDraw();
+      previewDraw({ x: offsetX, y: offsetY });
     }
   };
 
@@ -170,18 +192,24 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
     );
   }
 
-  const previewPortion = (center?: { x: number, y: number }) => {
-    const previewCTX = previewCanvas.getContext('2d');
-    if (!previewCTX) return;
-    const data = new Uint8ClampedArray(previewCTX.canvas.width * previewCTX.canvas.height * 4);
+  const previewDraw = (center?: { x: number, y: number }) => {
+    const readRatio = 1.2;
+    const readW = Math.ceil(previewRect.width / readRatio); // 放大1.2倍，所以读取时读小一点
+    const readH = Math.ceil(previewRect.height / readRatio); // 放大1.2倍，所以读取时读小一点
+    const data = new Uint8ClampedArray(readW * readH * 4);
     const centerX = center ? center.x : translate.x;
     const centerY = center ? center.y : translate.y;
-    const left = centerX - previewCTX.canvas.width / 2;
-    const bottom = centerY + previewCTX.canvas.height / 2;
-    gl.readPixels(left, gl.canvas.height - bottom, previewCTX.canvas.width, previewCTX.canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
-    const imageData = previewCTX.createImageData(previewCTX.canvas.width, previewCTX.canvas.height);
-    imageData.data.set(data);
-    previewCTX.putImageData(imageData, 0, 0);
+    const left = centerX - readW / 2;
+    const bottom = centerY + readH / 2;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(left, gl.canvas.height - bottom, readW, readH, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    const previewTeture = gl.createTexture();
+    WEBGL.setTexture(gl, previewProgram, previewTeture, 'u_image', 3);
+    WEBGL.configTeture(gl, previewTeture, data, readW, readH);
+    WEBGL.DrawCube(gl, previewProgram, null, [
+      { mat: previewAPosData, name: 'a_position', drawType: gl.STATIC_DRAW },
+      { mat: aTexCoord, name: 'a_texCoord', drawType: gl.STATIC_DRAW },
+    ], [], gl.canvas.width, gl.canvas.height, true);
   };
 
   const { unregister } = registerTouch(canvas, ({ offsetX, offsetY }) => {
@@ -201,7 +229,6 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
 
   const switchMode = (m: SPLASH_MODE) => {
     mode = m;
-    const previewParent = previewCanvas.parentElement;
     event.emit('splash-switch', mode);
     if (m !== SPLASH_MODE.MOVE) {
       if (m === SPLASH_MODE.COLOR) {
@@ -213,17 +240,7 @@ const initWebgl = (canvas: HTMLCanvasElement, previewCanvas: HTMLCanvasElement):
         const uMode = gl.getUniformLocation(patchProgram, 'u_mode');
         gl.uniform1i(uMode, 1); // 1相应位置是灰色
       }
-      if (previewParent) {
-        previewParent.style.opacity = '1';
-        previewParent.style.pointerEvents = 'none';
-        updateDraw();
-        previewPortion();
-      }
-    } else {
-      if (previewParent) {
-        previewParent.style.opacity = '0';
-        previewParent.style.pointerEvents = 'none';
-      }
+      updateDraw();
     }
   };
 
@@ -243,25 +260,6 @@ export default function init (opt: SplashOptions): Splash | undefined {
   canvas.width = container.clientWidth;
   canvas.height = container.clientHeight;
   container.append(canvas);
-  // preview container
-  let previewContainer: Element;
-  const previewCanvas = window.document.createElement('canvas');
-  previewCanvas.classList.add('_splash-preview-canvas');
-  if (opt.previewElm) {
-    previewContainer = opt.previewElm;
-    previewCanvas.width = previewContainer.clientWidth;
-    previewCanvas.height = previewContainer.clientHeight;
-  }
-  else {
-    previewContainer = window.document.createElement('div');
-    previewContainer.classList.add('_splash-preview-container');
-    window.document.body.append(previewContainer);
-    setTimeout(() => { // append之后，要获取到真实的宽高，需要等一段时间
-      previewCanvas.width = previewContainer.clientWidth;
-      previewCanvas.height = previewContainer.clientHeight;
-    }, 20);
-  }
-  previewContainer.append(previewCanvas);
 
-  return initWebgl(canvas, previewCanvas);
+  return initWebgl(canvas);
 }
