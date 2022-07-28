@@ -1,5 +1,9 @@
+import { circleVertextSource, colorFragmentSource } from './shader';
+
 const webgl = window.document.createElement('canvas').getContext('webgl');
 export const support = !!webgl && webgl instanceof WebGLRenderingContext;
+
+let circleProgram: WebGLProgram;
 
 declare global {
   interface WebGLRenderingContext {
@@ -94,7 +98,7 @@ export function setTexture (gl: WebGLRenderingContext, program: WebGLProgram, te
   }
 }
 
-export const setAttribute = (gl: WebGLRenderingContext, program: WebGLProgram, data: number[], attribute: string, drawType: number): void => {
+export const setAttribute = (gl: WebGLRenderingContext, program: WebGLProgram, data: number[], attribute: string, drawType: number, size = 2): void => {
   // 创建一个buff
   const buffer = gl.createBuffer();
   // 绑定buff到当前操作空间，并把值传给当前buff
@@ -104,7 +108,7 @@ export const setAttribute = (gl: WebGLRenderingContext, program: WebGLProgram, d
   const aLocation = gl.getAttribLocation(program, attribute);
   gl.enableVertexAttribArray(aLocation);
   // 设置顶点属性如何从顶点缓冲对象中取值。每次从数组缓冲对象中读取2个值
-  gl.vertexAttribPointer(aLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(aLocation, size, gl.FLOAT, false, 0, 0);
 };
 
 export const setUniformMat = (gl: WebGLRenderingContext, program: WebGLProgram, data: number[], uniform: string): void => {
@@ -163,6 +167,11 @@ export const createTranslateMat = (x: number, y: number): number[] => { // 平�
   ]
 };
 
+// export const creaateCircleVertext = (center: { x: number, y: number }, radius: number, count: number) => {
+//   const list = [];
+//   for (let i = 0; i <= )
+// }
+
 export const DrawCube = (
   gl: WebGLRenderingContext,
   program: WebGLProgram,
@@ -171,7 +180,7 @@ export const DrawCube = (
   uniforms?: { mat: number[], name: string }[],
   width?: number,
   height?: number,
-  keep?: boolean
+  keep?: boolean,
 ) => {
   const w = width || gl.canvas.width;
   const h = height || gl.canvas.height;
@@ -193,6 +202,58 @@ export const DrawCube = (
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   if (frameBuffer) gl.bindFramebuffer(gl.FRAMEBUFFER, null); // 将当前绘制空间重新指定为canvas
 }
+
+export const DrawCircle = (
+  gl: WebGLRenderingContext,
+  frameBuffer: WebGLBuffer | null,
+  x: number, y: number, radius: number,
+  r: number, g: number, b: number, a: number,
+  count = 20,
+  fill = false,
+  projMat?: number[] | null,
+  width?: number,
+  height?: number,
+  enableBlend?: boolean
+) : void => {
+  circleProgram = circleProgram || createProgram(gl, circleVertextSource, colorFragmentSource);
+  if (!circleProgram) return;
+  if (!frameBuffer || enableBlend) {
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  }
+  gl.useProgram(circleProgram);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+  const w = width || gl.canvas.width;
+  const h = height || gl.canvas.height;
+  gl.viewport(0, 0, w, h);
+  setUniformMat(gl, circleProgram, projMat || createProjectionMat(0, gl.canvas.width, 0, gl.canvas.height), 'u_projection');
+  setUniformMat(gl, circleProgram, createTranslateMat(x, y), 'u_translate');
+  setUniformVec4(gl, circleProgram, 'u_color', [r, g, b, a]);
+  const radiusLoc = gl.getUniformLocation(circleProgram, 'u_radius');
+  gl.uniform1f(radiusLoc, radius);
+  const radianUnit = 2 * Math.PI / count;
+  const radianData: number[] = [];
+  const flagData: number[] = [];
+  for (let i = 0; i < count; i += 1) {
+    radianData.push(i * radianUnit);
+    flagData.push(1);
+  }
+  let drawShape = gl.LINE_LOOP;
+  let drawCount = count;
+  if (fill) {
+    radianData.unshift(0);
+    flagData.push(0);
+    drawShape = gl.TRIANGLE_FAN;
+    drawCount = radianData.length - 1;
+  }
+  setAttribute(gl, circleProgram, radianData, 'a_radian', gl.STATIC_DRAW, 1);
+  setAttribute(gl, circleProgram, flagData, 'a_flag', gl.STATIC_DRAW, 1);
+  gl.drawArrays(drawShape, 0, drawCount);
+  if (frameBuffer) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  if (!frameBuffer || enableBlend) {
+    gl.disable(gl.BLEND);
+  }
+};
 
 export const clear = (gl: WebGLRenderingContext, frameBuffer: WebGLFramebuffer | null, r: number, g: number, b: number, a: number): void => {
   gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);

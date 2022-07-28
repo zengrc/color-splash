@@ -38,6 +38,8 @@ export enum SPLASH_MODE {
 const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   const gl = canvas.getContext('webgl');
   if (!gl) return;
+  // gl.enable(gl.DEPTH_TEST);
+  // gl.depthFunc(gl.LEQUAL);
   const event = new SplashEvent(splashEvent);
   // 绘制变量
   const size = {
@@ -154,6 +156,8 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     } else {
       patchDraw({x: offsetX, y: offsetY});
       updateDraw();
+      WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 0, 0, 0, 0.34, 20, true);
+      // WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 0, 1, 1);
       previewDraw({ x: offsetX, y: offsetY });
     }
   };
@@ -257,6 +261,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
 export default function init (opt: SplashOptions): Splash | undefined {
   const container = opt.elm || window.document.body;
   const canvas = window.document.createElement('canvas');
+  // canvas.style.background = 'red';
   canvas.width = container.clientWidth;
   canvas.height = container.clientHeight;
   container.append(canvas);

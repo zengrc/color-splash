@@ -104,3 +104,26 @@ export const previewFragmentSource = `
     gl_FragColor = texture;
   }
 `;
+
+// 实心圆用TRIANGLE_FAN画，第一个顶点需要时圆心，此时a_flag设置为0.0，其余圆周上的点a_flag设置1.0
+// 空心圆用LINE_LOOP画，所有点都是圆周上的点
+export const circleVertextSource = `
+  attribute float a_radian;
+  attribute float a_flag;
+  uniform mat4 u_projection;
+  uniform float u_radius;
+  uniform mat4 u_translate;
+
+  void main(void) {
+    gl_Position = u_projection * u_translate * vec4(a_flag * u_radius * cos(a_radian), a_flag * u_radius * sin(a_radian), 0, 1.0);
+  }
+`;
+
+export const colorFragmentSource = `
+  precision mediump float;
+  uniform vec4 u_color;
+
+  void main() {
+    gl_FragColor = u_color;
+  }
+`;
