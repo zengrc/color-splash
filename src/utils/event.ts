@@ -3,17 +3,17 @@ type CallBack = ((...arg: any) => any) | undefined
 type EventMap = { [key: number | string]: CallBack }
 
 export default class XEvent<T extends string[] | readonly string[]> {
-  nameList: T;
-  uidMap: { [key: string]: number } = {};
-  eventMap: { [key: string]: EventMap } = {};
+  private uidMap: { [key: string]: number } = {};
+  private eventMap: { [key: string]: EventMap } = {};
+  eventList: T;
   on: (name: T[number], cb: CallBack) => number;
   off: (name: T[number] , uid: number) => void;
   emit: (name: T[number] , ...arg: any) => void;
   clear: (name?: T[number]) => void;
 
   constructor(nameList: T) {
-    this.nameList = nameList;
-    nameList.forEach(name => {
+    this.eventList = nameList;
+    this.eventList.forEach(name => {
       this.uidMap[name] = 0;
       this.eventMap[name] = {};
     });

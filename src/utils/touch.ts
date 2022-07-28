@@ -21,12 +21,12 @@ const eventList = ['touchStart', 'touchMove', 'touchEnd'] as const;
 
 export default class TouchListener extends XEvent<typeof eventList> {
   touchType = TOUCH_TYPE.SINGLE_TOUCH;
-  curTouch: undefined | { x: number, y: number }[] = undefined;
-  touchTimer: undefined | number = undefined;
+  private curTouch: undefined | { x: number, y: number }[] = undefined;
+  private touchTimer: undefined | number = undefined;
   checkValid: undefined | ((param: TouchCheckParam) => boolean) = undefined;
-  rect: DOMRect;
-  offsetTop: number;
-  offsetLeft: number;
+  private rect: DOMRect;
+  private offsetTop: number;
+  private offsetLeft: number;
   elm: Element;
 
   constructor(elm: HTMLCanvasElement) {
@@ -38,9 +38,10 @@ export default class TouchListener extends XEvent<typeof eventList> {
 
     this.elm.addEventListener('touchstart', this.onTouchStart);
     this.elm.addEventListener('touchmove', this.onTouchMove);
+    this.elm.addEventListener('touchend', this.onTouchEnd)
   }
 
-  onTouchStart = (e: Event) => {
+  private onTouchStart = (e: Event) => {
     e.preventDefault();
     this.curTouch = undefined;
     window.clearTimeout(this.touchTimer);
@@ -68,7 +69,7 @@ export default class TouchListener extends XEvent<typeof eventList> {
     }, 100);
   };
 
-  onTouchMove = (e: Event) => {
+  private onTouchMove = (e: Event) => {
     e.preventDefault()
     if (this.curTouch) {
       const { touches } = e as TouchEvent;
@@ -79,7 +80,7 @@ export default class TouchListener extends XEvent<typeof eventList> {
         const diffY = touch0.clientY - this.curTouch[0].y;
         this.curTouch[0].x = touch0.clientX;
         this.curTouch[0].y = touch0.clientY;
-        this.emit('touchMove' ,{
+        this.emit('touchMove', {
           diffX,
           diffY,
           offsetX: touch0.clientX - this.offsetLeft,
@@ -89,16 +90,20 @@ export default class TouchListener extends XEvent<typeof eventList> {
     }
   }
 
-  onTouchEnd = (e: Event) => {
+  private onTouchEnd = (e: Event) => {
     e.preventDefault()
     if (this.curTouch) {
-      this.emit('touchEnd');
+      this.emit('touchEnd', {
+        offsetX: this.curTouch[0].x - this.offsetLeft,
+        offsetY: this.curTouch[0].y - this.offsetTop
+      });
     }
   }
 
-  unregister = () => {
+  clear = () => {
     this.elm.removeEventListener('touchstart', this.onTouchStart);
     this.elm.removeEventListener('touchmove', this.onTouchMove);
+    this.elm.removeEventListener('touchend', this.onTouchEnd);
     this.clear();
   };
 }

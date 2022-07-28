@@ -157,7 +157,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     } else {
       patchDraw({x: offsetX, y: offsetY});
       updateDraw();
-      WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 0, 0, 0, 0.34, 20, true);
+      WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 1, 1, 0.2, 20, true);
       // WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 0, 1, 1);
       previewDraw({ x: offsetX, y: offsetY });
     }
@@ -227,11 +227,18 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   };
 
   touchListener.on('touchMove', ({ diffX, diffY, offsetX, offsetY }) => {
-      move(diffX, diffY, offsetX, offsetY);
-    })
+    move(diffX, diffY, offsetX, offsetY);
+  });
+
+  touchListener.on('touchEnd', ({ offsetX, offsetY }) => {
+    if (mode !== SPLASH_MODE.MOVE) {
+      updateDraw();
+      previewDraw({ x: offsetX, y: offsetY });
+    }
+  });
 
   const destroy = () => {
-    touchListener.unregister();
+    touchListener.clear();
   };
 
   const switchMode = (m: SPLASH_MODE) => {
