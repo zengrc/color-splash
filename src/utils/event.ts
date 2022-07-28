@@ -9,6 +9,7 @@ export default class XEvent<T extends string[] | readonly string[]> {
   on: (name: T[number], cb: CallBack) => number;
   off: (name: T[number] , uid: number) => void;
   emit: (name: T[number] , ...arg: any) => void;
+  clear: (name?: T[number]) => void;
 
   constructor(nameList: T) {
     this.nameList = nameList;
@@ -43,6 +44,18 @@ export default class XEvent<T extends string[] | readonly string[]> {
           const fn = events[key];
           if (fn) fn(...arg);
         });
+      }
+    }
+
+    this.clear = (name?: T[number]): void => {
+      if (name && this.eventMap[name]) {
+        this.eventMap[name] = {};
+        this.uidMap[name] = 0;
+      } else {
+        Object.keys(this.eventMap).forEach(key => {
+          this.eventMap[key] = {};
+          this.uidMap[key] = 0;
+        })
       }
     }
   }

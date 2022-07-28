@@ -1,4 +1,4 @@
-import registerTouch from './touch';
+import TouchListener from './touch';
 // import './splash.css';
 import {
   vertextSource, fragmentSource,
@@ -61,6 +61,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   const frameBuffer = WEBGL.createFrameBuffer(gl);
   let patchBuffer: WebGLFramebuffer | null;
   let patchTexture: WebGLTexture | null;
+  const touchListener = new TouchListener(canvas);
   const picTexture = WEBGL.createTexture(gl);
   if (!program || !pickProgram || !frameBuffer || !patchProgram || !picTexture || !previewProgram) return;
   // 设置不变的矩阵
@@ -216,19 +217,21 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     ], [], gl.canvas.width, gl.canvas.height, true);
   };
 
-  const { unregister } = registerTouch(canvas, ({ offsetX, offsetY }) => {
+  touchListener.checkValid = ({ offsetX, offsetY }) => {
     updateDraw();
     gl.useProgram(pickProgram)
     gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
     const pixel = new Uint8Array(4);
     gl.readPixels(offsetX, gl.canvas.height - offsetY, 1 , 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
     return WEBGL.isObjUidMatch(1, pixel);
-  }, ({ diffX, diffY, offsetX, offsetY }) => {
-    move(diffX, diffY, offsetX, offsetY);
-  });
+  };
+
+  touchListener.on('touchMove', ({ diffX, diffY, offsetX, offsetY }) => {
+      move(diffX, diffY, offsetX, offsetY);
+    })
 
   const destroy = () => {
-    unregister();
+    touchListener.unregister();
   };
 
   const switchMode = (m: SPLASH_MODE) => {

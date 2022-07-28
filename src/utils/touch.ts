@@ -1,3 +1,5 @@
+import XEvent from "./event";
+
 export enum TOUCH_TYPE {
   SINGLE_TOUCH, // 单指
   DOUBLE_TOUCH // 双指
@@ -15,32 +17,50 @@ interface TouchCheckParam {
   offsetY: number
 }
 
-export default function register (canvas: HTMLCanvasElement, checkValid: (param: TouchCheckParam) => boolean, callback: (param: TouchParam) => void) {
-  let touchType = TOUCH_TYPE.SINGLE_TOUCH;
-  let curTouch: undefined | {x: number, y: number}[] = undefined;
-  let touchTimer: undefined | number = undefined;
-  const rect = canvas.getBoundingClientRect();
-  const { top: offsetTop, left: offsetLeft } = rect;
+const eventList = ['touchStart', 'touchMove', 'touchEnd'] as const;
 
-  const onTouchStart = (e: TouchEvent) => {
+export default class TouchListener extends XEvent<typeof eventList> {
+  touchType = TOUCH_TYPE.SINGLE_TOUCH;
+  curTouch: undefined | { x: number, y: number }[] = undefined;
+  touchTimer: undefined | number = undefined;
+  checkValid: undefined | ((param: TouchCheckParam) => boolean) = undefined;
+  rect: DOMRect;
+  offsetTop: number;
+  offsetLeft: number;
+  elm: Element;
+
+  constructor(elm: HTMLCanvasElement) {
+    super(eventList);
+    this.elm = elm;
+    this.rect = elm.getBoundingClientRect();
+    this.offsetTop = this.rect.top;
+    this.offsetLeft = this.rect.left;
+
+    this.elm.addEventListener('touchstart', this.onTouchStart);
+    this.elm.addEventListener('touchmove', this.onTouchMove);
+  }
+
+  onTouchStart = (e: Event) => {
     e.preventDefault();
-    curTouch = undefined;
-    window.clearTimeout(touchTimer);
-    touchTimer = window.setTimeout(() => { // 双指不一定同时触发，设一个timeout
-      if (!e.touches.length || e.touches.length > 2) return;
-      const touch0 = e.touches[0];
-      const touch1 = e.touches[1];
-      const ret = checkValid({
-        offsetX: touch0.clientX - offsetLeft,
-        offsetY: touch0.clientY - offsetTop
-      });
+    this.curTouch = undefined;
+    window.clearTimeout(this.touchTimer);
+    this.touchTimer = window.setTimeout(() => { // 双指不一定同时触发，设一个timeout
+      const { touches } = e as TouchEvent;
+      if (!touches.length || touches.length > 2) return;
+      const touch0 = touches[0];
+      const touch1 = touches[1];
+
+      const ret = this.checkValid ? this.checkValid({
+        offsetX: touch0.clientX - this.offsetLeft,
+        offsetY: touch0.clientY - this.offsetTop
+      }) : true;
       if (!ret) return;
-      if (e.touches.length === 1) {
-        touchType = TOUCH_TYPE.SINGLE_TOUCH;
-        curTouch = [{ x: touch0.clientX, y: touch0.clientY }];
-      } else if (e.touches.length === 2) {
-        touchType = TOUCH_TYPE.DOUBLE_TOUCH;
-        curTouch = [
+      if (touches.length === 1) {
+        this.touchType = TOUCH_TYPE.SINGLE_TOUCH;
+        this.curTouch = [{ x: touch0.clientX, y: touch0.clientY }];
+      } else if (touches.length === 2) {
+        this.touchType = TOUCH_TYPE.DOUBLE_TOUCH;
+        this.curTouch = [
           { x: touch0.clientX, y: touch0.clientX },
           { x: touch1.clientY, y: touch1.clientY }
         ];
@@ -48,35 +68,37 @@ export default function register (canvas: HTMLCanvasElement, checkValid: (param:
     }, 100);
   };
 
-  const onTouchMove = (e: TouchEvent) => {
+  onTouchMove = (e: Event) => {
     e.preventDefault()
-    if (curTouch) {
-      const touch0 = e.touches[0];
+    if (this.curTouch) {
+      const { touches } = e as TouchEvent;
+      const touch0 = touches[0];
       // const touch1 = e.touches[1];
-      if (touchType === TOUCH_TYPE.SINGLE_TOUCH && touch0) {
-        const diffX = touch0.clientX - curTouch[0].x;
-        const diffY = touch0.clientY - curTouch[0].y;
-        curTouch[0].x = touch0.clientX;
-        curTouch[0].y = touch0.clientY;
-        callback({
+      if (this.touchType === TOUCH_TYPE.SINGLE_TOUCH && touch0) {
+        const diffX = touch0.clientX - this.curTouch[0].x;
+        const diffY = touch0.clientY - this.curTouch[0].y;
+        this.curTouch[0].x = touch0.clientX;
+        this.curTouch[0].y = touch0.clientY;
+        this.emit('touchMove' ,{
           diffX,
           diffY,
-          offsetX: touch0.clientX - offsetLeft,
-          offsetY: touch0.clientY - offsetTop
+          offsetX: touch0.clientX - this.offsetLeft,
+          offsetY: touch0.clientY - this.offsetTop
         });
       }
     }
   }
 
-  canvas.addEventListener('touchstart', onTouchStart);
-  canvas.addEventListener('touchmove', onTouchMove);
-
-  const unregister = () => {
-    canvas.removeEventListener('touchstart', onTouchStart);
-    canvas.removeEventListener('touchmove', onTouchMove);
-  };
-
-  return {
-    unregister
+  onTouchEnd = (e: Event) => {
+    e.preventDefault()
+    if (this.curTouch) {
+      this.emit('touchEnd');
+    }
   }
+
+  unregister = () => {
+    this.elm.removeEventListener('touchstart', this.onTouchStart);
+    this.elm.removeEventListener('touchmove', this.onTouchMove);
+    this.clear();
+  };
 }
