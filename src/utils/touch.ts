@@ -78,14 +78,16 @@ export default class TouchListener extends XEvent<typeof eventList> {
       if (this.touchType === TOUCH_TYPE.SINGLE_TOUCH && touch0) {
         const diffX = touch0.clientX - this.curTouch[0].x;
         const diffY = touch0.clientY - this.curTouch[0].y;
-        this.curTouch[0].x = touch0.clientX;
-        this.curTouch[0].y = touch0.clientY;
         this.emit('touchMove', {
           diffX,
           diffY,
-          offsetX: touch0.clientX - this.offsetLeft,
-          offsetY: touch0.clientY - this.offsetTop
+          x: touch0.clientX - this.offsetLeft,
+          y: touch0.clientY - this.offsetTop,
+          preX: this.curTouch[0].x - this.offsetLeft,
+          preY: this.curTouch[0].y - this.offsetTop,
         });
+        this.curTouch[0].x = touch0.clientX;
+        this.curTouch[0].y = touch0.clientY;
       }
     }
   }
@@ -94,8 +96,8 @@ export default class TouchListener extends XEvent<typeof eventList> {
     e.preventDefault()
     if (this.curTouch) {
       this.emit('touchEnd', {
-        offsetX: this.curTouch[0].x - this.offsetLeft,
-        offsetY: this.curTouch[0].y - this.offsetTop
+        x: this.curTouch[0].x - this.offsetLeft,
+        y: this.curTouch[0].y - this.offsetTop
       });
     }
   }

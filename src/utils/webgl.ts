@@ -213,11 +213,10 @@ export const DrawCircle = (
   projMat?: number[] | null,
   width?: number,
   height?: number,
-  enableBlend?: boolean
 ) : void => {
   circleProgram = circleProgram || createProgram(gl, circleVertextSource, colorFragmentSource);
   if (!circleProgram) return;
-  if (!frameBuffer || enableBlend) {
+  if (a !== 1) {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
@@ -250,7 +249,7 @@ export const DrawCircle = (
   setAttribute(gl, circleProgram, flagData, 'a_flag', gl.STATIC_DRAW, 1);
   gl.drawArrays(drawShape, 0, drawCount);
   if (frameBuffer) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  if (!frameBuffer || enableBlend) {
+  if (a !== 1) {
     gl.disable(gl.BLEND);
   }
 };

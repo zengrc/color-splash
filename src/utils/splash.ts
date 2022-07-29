@@ -19,7 +19,6 @@ export interface SplashOptions {
 
 export interface Splash {
   reset: (src: HTMLImageElement) => void,
-  move: (x: number, y: number, offsetX: number, offsetY: number) => void,
   destroy: () => void,
   SPLASH_MODE: typeof SPLASH_MODE,
   switch: (m: SPLASH_MODE) => void,
@@ -149,21 +148,21 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     // updateDraw();
   };
 
-  const move = (diffX: number, diffY: number, offsetX: number, offsetY: number) => {
+  const move = (diffX: number, diffY: number, x: number, y: number, preX: number, preY: number) => {
     if (mode === SPLASH_MODE.MOVE) {
       translate.x += diffX;
       translate.y += diffY;
       updateDraw();
     } else {
-      patchDraw({x: offsetX, y: offsetY});
+      patchDraw({x, y}, { x: preX, y: preY });
       updateDraw();
-      WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 1, 1, 0.2, 20, true);
+      WEBGL.DrawCircle(gl, null, x, y, splashSize, 1, 1, 1, 0.2, 20, true);
       // WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 0, 1, 1);
-      previewDraw({ x: offsetX, y: offsetY });
+      previewDraw({ x, y });
     }
   };
 
-  const patchDraw = (point: {x: number, y: number}) => {
+  const patchDraw = (p1: {x: number, y: number}, p2: {x: number, y: number}) => {
     // 由于patchdraw的结果会作为纹理，再下次绘制图片的过程中叠加进去，而纹理和webgl的y轴是相反的，所以投影矩阵，y也得反过来
     const projMat = WEBGL.createProjectionMat(0, size.width, size.height, 0);
     // 由于此时的point是在已经做过旋转平移后的图片基础上获取到的point，需要还原之前的操作
@@ -173,16 +172,25 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     const roateMat = WEBGL.createRotateMat(-rotate);
     // 还原后，移动图片，让其左上角与canvas重叠
     const translateMat2 = WEBGL.createTranslateMat(size.width / 2, size.height / 2);
-    const left = point.x - splashSize;
-    const top = point.y - splashSize;
-    const bottom = point.y + splashSize;
-    const right = point.x + splashSize;
+    // 计算两点间向量
+    let v = { x: p2.x - p1.x, y: p2.y - p1.y };
+    const len = Math.sqrt(Math.pow(v.x, 2) + Math.pow(v.y, 2));
+    v = { x: v.x / len, y: v.y / len }; // 归一
+    const v1 = { x: v.y * splashSize, y: -v.x * splashSize }; // 与v垂直的一侧向量，长度splashSize
+    const v2 = { x: -v.y * splashSize, y: v.x * splashSize }; // 与v垂直的另一侧向量，长度splashSize
+
+    const p1v1 = { x: v1.x + p1.x, y: v1.y + p1.y };
+    const p1v2 = { x: v2.x + p1.x, y: v2.y + p1.y };
+    const p2v1 = { x: v1.x + p2.x, y: v1.y + p2.y };
+    const p2v2 = { x: v2.x + p2.x, y: v2.y + p2.y };
+
     const aPosData = [
-      left, bottom,
-      right, bottom,
-      left, top,
-      right, top,
+      p1v1.x, p1v1.y,
+      p1v2.x, p1v2.y,
+      p2v1.x, p2v1.y,
+      p2v2.x, p2v2.y,
     ];
+
     WEBGL.DrawCube(
       gl, patchProgram, patchBuffer,
       [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
@@ -226,14 +234,14 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     return WEBGL.isObjUidMatch(1, pixel);
   };
 
-  touchListener.on('touchMove', ({ diffX, diffY, offsetX, offsetY }) => {
-    move(diffX, diffY, offsetX, offsetY);
+  touchListener.on('touchMove', ({ diffX, diffY, x, y, preX, preY }) => {
+    move(diffX, diffY, x, y, preX, preY);
   });
 
-  touchListener.on('touchEnd', ({ offsetX, offsetY }) => {
+  touchListener.on('touchEnd', ({ x, y }) => {
     if (mode !== SPLASH_MODE.MOVE) {
       updateDraw();
-      previewDraw({ x: offsetX, y: offsetY });
+      previewDraw({ x, y });
     }
   });
 
@@ -260,7 +268,6 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
 
   return {
     reset: resetImage,
-    move,
     destroy,
     switch: switchMode,
     SPLASH_MODE,
