@@ -15,6 +15,9 @@
       <div class="btn" @click="switchMode(SPLASH_MODE.MOVE)" :class="{ actived: mode === SPLASH_MODE.MOVE }">
         移动图片
       </div>
+      <div class="btn" @click="onSave">
+        保存
+      </div>
     </div>
     <div id="splash-preview"></div>
   </div>
@@ -44,6 +47,7 @@ export default defineComponent({
             const img = new Image();
             img.onload = () => {
               splash.value?.reset(img);
+              console.dir(img);
             }
             img.src = ev.target.result as string;
           }
@@ -55,6 +59,10 @@ export default defineComponent({
 
     const switchMode = (mode: SPLASH_MODE) => {
       splash.value?.switch(mode);
+    };
+
+    const onSave = () => {
+      splash.value?.save();
     };
 
     onMounted(() => {
@@ -74,7 +82,8 @@ export default defineComponent({
       splash,
       switchMode,
       SPLASH_MODE,
-      mode
+      mode,
+      onSave
     }
   }
 });

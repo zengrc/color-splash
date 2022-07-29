@@ -22,6 +22,7 @@ export interface Splash {
   destroy: () => void,
   SPLASH_MODE: typeof SPLASH_MODE,
   switch: (m: SPLASH_MODE) => void,
+  save: () => void,
   event: {
     on: SplashEvent['on'],
     off: SplashEvent['off']
@@ -52,6 +53,18 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   let rotate = 0;
   const splashSize = 5;
   let mode = SPLASH_MODE.MOVE;
+  const saveInfo: {
+    canvas: HTMLCanvasElement | null,
+    gl: WebGLRenderingContext | null,
+    drawProgram: WebGLProgram | null,
+    texTure: WebGLTexture | null,
+  } = {
+    canvas: null,
+    gl: null,
+    drawProgram: null,
+    texTure: null,
+  };
+  const sourceInfo = { width: 0, height: 0, patchW: 0, patchH: 0, src: null as (HTMLImageElement | null) };
   // 创建webgl program
   const program = WEBGL.createProgram(gl, vertextSource, fragmentSource);
   const pickProgram = WEBGL.createProgram(gl, pickVertextSource, pickFragmentSource); // 判断点击时是否击中图片
@@ -136,6 +149,11 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     const ratio = Math.min(ratioW, ratioH);
     size.width = source.width * ratio;
     size.height = source.height * ratio;
+    sourceInfo.width = source.width;
+    sourceInfo.height = source.height;
+    sourceInfo.patchW = size.width;
+    sourceInfo.patchH = size.height;
+    sourceInfo.src = source;
     translate.x = gl.canvas.width / 2;
     translate.y = gl.canvas.height / 2;
     rotate = 0;
@@ -225,6 +243,59 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     ], [], gl.canvas.width, gl.canvas.height, true);
   };
 
+  const save = (): void => {
+    if (!sourceInfo.src) return;
+    if (!saveInfo.canvas) {
+      saveInfo.canvas = document.createElement('canvas');
+      saveInfo.gl = saveInfo.canvas.getContext('webgl');
+      if (!saveInfo.gl) return;
+      saveInfo.drawProgram = WEBGL.createProgram(saveInfo.gl, vertextSource, fragmentSource);
+      if (!saveInfo.drawProgram) return;
+      saveInfo.texTure = WEBGL.createTexture(saveInfo.gl);
+      WEBGL.setTexture(saveInfo.gl, saveInfo.drawProgram, saveInfo.texTure, 'u_image', 0, sourceInfo.src);
+    }
+    if (!saveInfo.gl || !saveInfo.drawProgram) return;
+    saveInfo.canvas.width = sourceInfo.width;
+    saveInfo.canvas.height = sourceInfo.height;
+
+    const projMat = WEBGL.createProjectionMat(0, sourceInfo.width, 0, sourceInfo.height);
+    saveInfo.gl.useProgram(saveInfo.drawProgram);
+    WEBGL.setUniformMat(saveInfo.gl, saveInfo.drawProgram, projMat, 'u_projection');
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, patchBuffer);
+    const data = new Uint8ClampedArray(sourceInfo.patchW * sourceInfo.patchH * 4);
+    gl.readPixels(0, 0, sourceInfo.patchW, sourceInfo.patchH, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    const pTexture = saveInfo.gl.createTexture();
+    WEBGL.setTexture(saveInfo.gl, saveInfo.drawProgram, pTexture, 'u_image_patch', 1);
+    WEBGL.configTeture(saveInfo.gl, pTexture, data, sourceInfo.patchW, sourceInfo.patchH);
+    
+    const left =  0;
+    const right = sourceInfo.width;
+    const top = 0;
+    const bottom = sourceInfo.height;
+    const aPosData = [
+      left, top,
+      right, top,
+      left, bottom,
+      right, bottom,
+    ];
+    const roateMat = WEBGL.createRotateMat(0);
+    const translateMat = WEBGL.createTranslateMat(0, 0);
+    WEBGL.DrawCube(
+      saveInfo.gl, saveInfo.drawProgram, null,
+      [{ mat: aPosData, name: 'a_position', drawType: saveInfo.gl.STATIC_DRAW }, { mat: aTexCoord, name: 'a_texCoord', drawType: saveInfo.gl.STATIC_DRAW }],
+      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
+    );
+
+    const ret = saveInfo.canvas.toDataURL();
+    const a = document.createElement('a');
+    a.href = ret;
+    a.download = `IMG${Date.now()}.png`;
+    a.click();
+  };
+
   touchListener.checkValid = ({ offsetX, offsetY }) => {
     updateDraw();
     gl.useProgram(pickProgram)
@@ -271,7 +342,8 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     destroy,
     switch: switchMode,
     SPLASH_MODE,
-    event: { on: event.on, off: event.off }
+    event: { on: event.on, off: event.off },
+    save
   };
 }
 
