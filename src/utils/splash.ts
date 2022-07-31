@@ -191,16 +191,18 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     // 还原后，移动图片，让其左上角与canvas重叠
     const translateMat2 = WEBGL.createTranslateMat(size.width / 2, size.height / 2);
     // 计算两点间向量
-    let v = { x: p2.x - p1.x, y: p2.y - p1.y };
-    const len = Math.sqrt(Math.pow(v.x, 2) + Math.pow(v.y, 2));
-    v = { x: v.x / len, y: v.y / len }; // 归一
-    const v1 = { x: v.y * splashSize, y: -v.x * splashSize }; // 与v垂直的一侧向量，长度splashSize
-    const v2 = { x: -v.y * splashSize, y: v.x * splashSize }; // 与v垂直的另一侧向量，长度splashSize
+    let p1p2 = { x: p2.x - p1.x, y: p2.y - p1.y };
+    const len = Math.sqrt(Math.pow(p1p2.x, 2) + Math.pow(p1p2.y, 2));
+    p1p2 = { x: p1p2.x / len, y: p1p2.y / len }; // 归一
+    const v1 = { x: p1p2.y * splashSize, y: -p1p2.x * splashSize }; // 与v垂直的一侧向量，长度splashSize
+    const v2 = { x: -p1p2.y * splashSize, y: p1p2.x * splashSize }; // 与v垂直的另一侧向量，长度splashSize
 
-    const p1v1 = { x: v1.x + p1.x, y: v1.y + p1.y };
-    const p1v2 = { x: v2.x + p1.x, y: v2.y + p1.y };
-    const p2v1 = { x: v1.x + p2.x, y: v1.y + p2.y };
-    const p2v2 = { x: v2.x + p2.x, y: v2.y + p2.y };
+    // 向量p1p2，p1作为起点，需要往反方向扩展splashSize的长度
+    const p1v1 = { x: v1.x + p1.x - p1p2.x * splashSize, y: v1.y + p1.y - p1p2.y * splashSize };
+    const p1v2 = { x: v2.x + p1.x - p1p2.x * splashSize, y: v2.y + p1.y - p1p2.y * splashSize };
+    // 向量p1p2，p2作为终点，需要往正方向扩展splashSize的长度
+    const p2v1 = { x: v1.x + p2.x + p1p2.x * splashSize, y: v1.y + p2.y + p1p2.y * splashSize };
+    const p2v2 = { x: v2.x + p2.x + p1p2.x * splashSize, y: v2.y + p2.y + p1p2.y * splashSize };
 
     const aPosData = [
       p1v1.x, p1v1.y,

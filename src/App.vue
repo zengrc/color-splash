@@ -47,7 +47,6 @@ export default defineComponent({
             const img = new Image();
             img.onload = () => {
               splash.value?.reset(img);
-              console.dir(img);
             }
             img.src = ev.target.result as string;
           }
@@ -71,7 +70,6 @@ export default defineComponent({
       if (divContainer && previewContainer) {
         splash.value = splashInit({ elm: divContainer, previewElm: previewContainer });
         splash.value?.event.on('splash-switch', (m) => {
-
           mode.value = m;
         })
       }
