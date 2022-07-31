@@ -14,7 +14,6 @@ class SplashEvent extends XEvent<typeof splashEvent> {}
 
 export interface SplashOptions {
   elm?: Element,
-  previewElm?: Element
 }
 
 export interface Splash {
@@ -22,7 +21,7 @@ export interface Splash {
   destroy: () => void,
   SPLASH_MODE: typeof SPLASH_MODE,
   switch: (m: SPLASH_MODE) => void,
-  save: () => void,
+  output: () => string | undefined,
   event: {
     on: SplashEvent['on'],
     off: SplashEvent['off']
@@ -245,7 +244,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     ], [], gl.canvas.width, gl.canvas.height, true);
   };
 
-  const save = (): void => {
+  const output = (): string | undefined => {
     if (!sourceInfo.src) return;
     if (!saveInfo.canvas) {
       saveInfo.canvas = document.createElement('canvas');
@@ -292,10 +291,16 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     );
 
     const ret = saveInfo.canvas.toDataURL();
-    const a = document.createElement('a');
-    a.href = ret;
-    a.download = `IMG${Date.now()}.png`;
-    a.click();
+    return ret;
+    // const a = document.createElement('a');
+    // a.href = ret;
+    // a.download = `IMG${Date.now()}.png`;
+    // const ev = new MouseEvent('click', {
+    //   bubbles: true,
+    //   cancelable: true,
+    //   view: window
+    // })
+    // a.dispatchEvent(ev);
   };
 
   touchListener.checkValid = ({ offsetX, offsetY }) => {
@@ -345,7 +350,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     switch: switchMode,
     SPLASH_MODE,
     event: { on: event.on, off: event.off },
-    save
+    output
   };
 }
 
