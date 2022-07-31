@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <div id="color-splash"></div>
+    <div id="color-splash" :style="containerStyle"></div>
     <div class="btn-list">
       <div class="btn">
         选择图片
@@ -19,12 +19,23 @@
         保存
       </div>
     </div>
-    <div id="splash-preview"></div>
+    <div class="save" v-if="showRet">
+      <img :src="saveData" alt="img" />
+      <div class="tips">
+        请长按图片保存
+      </div>
+      <div class="close" @click="showRet = false">
+        <svg width="100%" height="100%">
+          <line x1="0" y1="0" x2="100%" y2="100%" stroke="#FFFFFF" stroke-linecap="round"></line>
+          <line x1="100%" y1="0" x2="0" y2="100%" stroke="#FFFFFF" stroke-linecap="round"></line>
+        </svg>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref } from 'vue';
+import { defineComponent, onMounted, ref, reactive, nextTick } from 'vue';
 import splashInit, { Splash, SPLASH_MODE } from './utils/splash';
 
 export default defineComponent({
@@ -32,6 +43,11 @@ export default defineComponent({
   setup() {
     const splash = ref<Splash>();
     const mode = ref<SPLASH_MODE>();
+    const showRet = ref(false);
+    const saveData = ref('');
+    const containerStyle = reactive({
+      height: ''
+    });
 
     const selectImage = (e: Event) => {
       if (!splash) {
@@ -47,7 +63,6 @@ export default defineComponent({
             const img = new Image();
             img.onload = () => {
               splash.value?.reset(img);
-              console.dir(img);
             }
             img.src = ev.target.result as string;
           }
@@ -62,22 +77,30 @@ export default defineComponent({
     };
 
     const onSave = () => {
-      splash.value?.save();
+      const ret = splash.value?.output();
+      if (ret) {
+        saveData.value = ret;
+        showRet.value = true;
+      }
     };
 
     onMounted(() => {
-      const divContainer = window.document.querySelector('#color-splash');
-      const previewContainer = window.document.querySelector('#splash-preview');
-      if (divContainer && previewContainer) {
-        splash.value = splashInit({ elm: divContainer, previewElm: previewContainer });
-        splash.value?.event.on('splash-switch', (m) => {
-
-          mode.value = m;
-        })
-      }
+      containerStyle.height = `${window.innerHeight}px`;
+      nextTick(() => {
+        const divContainer = window.document.querySelector('#color-splash');
+        if (divContainer) {
+          splash.value = splashInit({ elm: divContainer });
+          splash.value?.event.on('splash-switch', (m) => {
+            mode.value = m;
+          })
+        }
+      });
     });
 
     return {
+      showRet,
+      saveData,
+      containerStyle,
       selectImage,
       splash,
       switchMode,
@@ -101,7 +124,6 @@ body {
 
 #app, #color-splash {
   width: 100%;
-  height: 100vh;
   position: relative;
 }
 
@@ -112,6 +134,38 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.save {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  background: #000000;
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .tips {
+    color: aliceblue;
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    padding: 0 100px;
+    width: fit-content;
+  }
+  .close {
+    width: 30px;
+    height: 30px;
+    position: absolute;
+    top: 30px;
+    right: 30px;
+  }
 }
 
 .btn {
