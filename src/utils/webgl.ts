@@ -80,6 +80,14 @@ export function configTeture (gl: WebGLRenderingContext, texture: WebGLTexture |
   }
 }
 
+export function resetTeture (gl: WebGLRenderingContext, texture: WebGLTexture | null, source?: TexImageSource | ArrayBufferView | null, width?: number, height?: number): void {
+  if (width && height) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, source as (ArrayBufferView | null));
+  } else if (source) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
+  }
+}
+
 export function setTexture (gl: WebGLRenderingContext, program: WebGLProgram, texture: WebGLTexture | null, uniform: string, index: number): void
 export function setTexture (gl: WebGLRenderingContext, program: WebGLProgram, texture: WebGLTexture | null, uniform: string, index: number, source: TexImageSource): void
 export function setTexture (gl: WebGLRenderingContext, program: WebGLProgram, texture: WebGLTexture | null, uniform: string, index: number, source: ArrayBufferView | null, width: number, height: number): void
