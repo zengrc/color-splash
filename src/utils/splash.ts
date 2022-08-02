@@ -51,6 +51,8 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
   };
   let rotate = 0;
   let scale = 1;
+  const minScale = 0.5;
+  const maxScale = 3;
   const splashSize = 5;
   let mode = SPLASH_MODE.MOVE;
   const saveInfo: {
@@ -180,6 +182,8 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     const translateMat1 = WEBGL.createTranslateMat(-translate.x, -translate.y);
     // 还原2，旋转回原角度
     const roateMat = WEBGL.createRotateMat(-rotate);
+    // 还原3，还原缩放大小
+    const scaleMat = WEBGL.createRotateMat(1 / scale);
     // 还原后，移动图片，让其左上角与canvas重叠
     const translateMat2 = WEBGL.createTranslateMat(width / 2, height / 2);
     // 计算两点间向量
@@ -210,7 +214,8 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
         { mat: projMat, name: 'u_projection' },
         { mat: roateMat, name: 'u_rotate' },
         { mat: translateMat1, name: 'u_translate1' },
-        { mat: translateMat2, name: 'u_translate2' }
+        { mat: translateMat2, name: 'u_translate2' },
+        { mat: scaleMat, name: 'u_scale' }
       ],
       size.width, size.height, // 这里的宽高是用来指示画图大小的，上面缩放后的宽高是用来计算坐标位置的对应关系，两者不必相等
       true
@@ -341,6 +346,14 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     if (mode !== SPLASH_MODE.MOVE) {
       updateDraw();
       previewDraw({ x, y });
+    } else {
+      if (scale > maxScale) {
+        scale = maxScale;
+        updateDraw();
+      } else if (scale < minScale) {
+        scale = minScale;
+        updateDraw();
+      }
     }
   });
 
