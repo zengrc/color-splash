@@ -351,8 +351,8 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
       if (scale > maxScale) tempScale = maxScale;
       else if (scale < minScale) tempScale = minScale;
       if (scale !== tempScale) {
-        scale = tempScale;
         const diffScale = +(tempScale / scale).toFixed(2);
+        scale = tempScale;
         translate.x = diffScale * (translate.x - x) + x;
         translate.y = diffScale * (translate.y - y) + y;
         updateDraw();
