@@ -167,6 +167,15 @@ export const createTranslateMat = (x: number, y: number): number[] => { // 平�
   ]
 };
 
+export const createScaleMat = (scale: number): number[] => { // 平移矩阵
+  return [
+    scale, 0, 0, 0,
+    0, scale, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]
+};
+
 // export const creaateCircleVertext = (center: { x: number, y: number }, radius: number, count: number) => {
 //   const list = [];
 //   for (let i = 0; i <= )

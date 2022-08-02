@@ -50,6 +50,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     y: 0
   };
   let rotate = 0;
+  let scale = 1;
   const splashSize = 5;
   let mode = SPLASH_MODE.MOVE;
   const saveInfo: {
@@ -129,16 +130,18 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     ];
     const roateMat = WEBGL.createRotateMat(rotate);
     const translateMat = WEBGL.createTranslateMat(translate.x, translate.y);
+    const scaleMat = WEBGL.createScaleMat(scale);
     // 绘制两次，一次在framebuffer上，一次在canvas上，保持两者变换一致
+    // framebuffer的用来判断点击是否点中图形
     WEBGL.DrawCube(
       gl, pickProgram, frameBuffer,
       [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }],
-      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
+      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }, { mat: scaleMat, name: 'u_scale' }],
     );
     WEBGL.DrawCube(
       gl, program, null,
       [{ mat: aPosData, name: 'a_position', drawType: gl.DYNAMIC_DRAW }, { mat: aTexCoord, name: 'a_texCoord', drawType: gl.STATIC_DRAW }],
-      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
+      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }, { mat: scaleMat, name: 'u_scale' }],
     );
   };
 
@@ -156,6 +159,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     translate.x = gl.canvas.width / 2;
     translate.y = gl.canvas.height / 2;
     rotate = 0;
+    scale = 1;
     patchTexture = WEBGL.createTexture(gl, null, size.width, size.height);
     patchBuffer = WEBGL.createFrameBuffer(gl, patchTexture);
     WEBGL.setTexture(gl, program, picTexture, 'u_image', 0, source);
@@ -165,30 +169,19 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     // updateDraw();
   };
 
-  const move = (diffX: number, diffY: number, x: number, y: number, preX: number, preY: number) => {
-    if (mode === SPLASH_MODE.MOVE) {
-      translate.x += diffX;
-      translate.y += diffY;
-      updateDraw();
-    } else {
-      patchDraw({x, y}, { x: preX, y: preY });
-      updateDraw();
-      WEBGL.DrawCircle(gl, null, x, y, splashSize, 1, 1, 1, 0.2, 20, true);
-      // WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 0, 1, 1);
-      previewDraw({ x, y });
-    }
-  };
-
   const patchDraw = (p1: {x: number, y: number}, p2: {x: number, y: number}) => {
     // 由于patchdraw的结果会作为纹理，再下次绘制图片的过程中叠加进去，而纹理和webgl的y轴是相反的，所以投影矩阵，y也得反过来
-    const projMat = WEBGL.createProjectionMat(0, size.width, size.height, 0);
+    // 同时由于涂色是发生在缩小放大之后，实际的矩阵变换应该是放大缩小之后的宽高
+    const width = size.width * scale;
+    const height = size.height * scale;
+    const projMat = WEBGL.createProjectionMat(0, width, height, 0);
     // 由于此时的point是在已经做过旋转平移后的图片基础上获取到的point，需要还原之前的操作
     // 还原1，先平移回原点
     const translateMat1 = WEBGL.createTranslateMat(-translate.x, -translate.y);
     // 还原2，旋转回原角度
     const roateMat = WEBGL.createRotateMat(-rotate);
     // 还原后，移动图片，让其左上角与canvas重叠
-    const translateMat2 = WEBGL.createTranslateMat(size.width / 2, size.height / 2);
+    const translateMat2 = WEBGL.createTranslateMat(width / 2, height / 2);
     // 计算两点间向量
     let p1p2 = { x: p2.x - p1.x, y: p2.y - p1.y };
     const len = Math.sqrt(Math.pow(p1p2.x, 2) + Math.pow(p1p2.y, 2));
@@ -219,7 +212,7 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
         { mat: translateMat1, name: 'u_translate1' },
         { mat: translateMat2, name: 'u_translate2' }
       ],
-      size.width, size.height,
+      size.width, size.height, // 这里的宽高是用来指示画图大小的，上面缩放后的宽高是用来计算坐标位置的对应关系，两者不必相等
       true
     );
   }
@@ -259,10 +252,6 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     saveInfo.canvas.width = sourceInfo.width;
     saveInfo.canvas.height = sourceInfo.height;
 
-    const projMat = WEBGL.createProjectionMat(0, sourceInfo.width, 0, sourceInfo.height);
-    saveInfo.gl.useProgram(saveInfo.drawProgram);
-    WEBGL.setUniformMat(saveInfo.gl, saveInfo.drawProgram, projMat, 'u_projection');
-
     gl.bindFramebuffer(gl.FRAMEBUFFER, patchBuffer);
     const data = new Uint8ClampedArray(sourceInfo.patchW * sourceInfo.patchH * 4);
     gl.readPixels(0, 0, sourceInfo.patchW, sourceInfo.patchH, gl.RGBA, gl.UNSIGNED_BYTE, data);
@@ -284,10 +273,12 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     ];
     const roateMat = WEBGL.createRotateMat(0);
     const translateMat = WEBGL.createTranslateMat(0, 0);
+    const scaleMat = WEBGL.createScaleMat(1);
+    const projMat = WEBGL.createProjectionMat(0, sourceInfo.width, 0, sourceInfo.height);
     WEBGL.DrawCube(
       saveInfo.gl, saveInfo.drawProgram, null,
       [{ mat: aPosData, name: 'a_position', drawType: saveInfo.gl.STATIC_DRAW }, { mat: aTexCoord, name: 'a_texCoord', drawType: saveInfo.gl.STATIC_DRAW }],
-      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }],
+      [{ mat: translateMat, name: 'u_translate' }, { mat: roateMat, name: 'u_rotate' }, { mat: projMat, name: 'u_projection' }, { mat: scaleMat, name: 'u_scale' }],
     );
 
     const ret = saveInfo.canvas.toDataURL();
@@ -312,8 +303,38 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     return WEBGL.isObjUidMatch(1, pixel);
   };
 
-  touchListener.on('touchMove', ({ diffX, diffY, x, y, preX, preY }) => {
-    move(diffX, diffY, x, y, preX, preY);
+  touchListener.on('touchMove', ({ touches, preTouches }) => {
+    if (mode === SPLASH_MODE.MOVE) {
+      if (touchListener.touchType === touchListener.TOUCH_TYPE.SINGLE_TOUCH) {
+        const diffX = touches[0].x - preTouches[0].x;
+        const diffY = touches[0].y - preTouches[0].y;
+        translate.x += diffX;
+        translate.y += diffY;
+      } else if (touchListener.touchType === touchListener.TOUCH_TYPE.DOUBLE_TOUCH) {
+        const lenPow = Math.pow(touches[0].x - touches[1].x, 2) + Math.pow(touches[0].y - touches[1].y, 2);
+        const preLen = Math.pow(preTouches[0].x - preTouches[1].x, 2) + Math.pow(preTouches[0].y - preTouches[1].y, 2);
+        const diffScale = +Math.sqrt(lenPow / preLen).toFixed(2);
+        scale *= diffScale;
+        const center = { x: (touches[0].x + touches[1].x) / 2, y: (touches[0].y + touches[1].y) / 2 };
+        const preCenter = { x: (preTouches[0].x + preTouches[1].x) / 2, y: (preTouches[0].y + preTouches[1].y) / 2 };
+        // translate就是目前图案中心的位移
+        // 双指中心到图案中心的单位向量不变，长度等于放大缩小的倍数
+        // 所以有 (translate - center) = scale * (preTranslate - preCenter)
+        translate.x = diffScale * (translate.x - preCenter.x) + center.x;
+        translate.y = diffScale * (translate.y - preCenter.y) + center.y;
+      }
+      updateDraw();
+    } else {
+      if (touchListener.touchType === touchListener.TOUCH_TYPE.SINGLE_TOUCH) {
+        const { x, y } = touches[0];
+        const { x: preX, y: preY } = preTouches[0];
+        patchDraw({x, y}, { x: preX, y: preY });
+        updateDraw();
+        WEBGL.DrawCircle(gl, null, x, y, splashSize, 1, 1, 1, 0.2, 20, true);
+        // WEBGL.DrawCircle(gl, null, offsetX, offsetY, 10, 1, 0, 1, 1);
+        previewDraw({ x, y });
+      }
+    }
   });
 
   touchListener.on('touchEnd', ({ x, y }) => {

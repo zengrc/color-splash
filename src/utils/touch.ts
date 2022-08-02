@@ -21,6 +21,7 @@ const eventList = ['touchStart', 'touchMove', 'touchEnd'] as const;
 
 export default class TouchListener extends XEvent<typeof eventList> {
   touchType = TOUCH_TYPE.SINGLE_TOUCH;
+  TOUCH_TYPE = TOUCH_TYPE;
   private curTouch: undefined | { x: number, y: number }[] = undefined;
   private touchTimer: undefined | number = undefined;
   checkValid: undefined | ((param: TouchCheckParam) => boolean) = undefined;
@@ -62,8 +63,8 @@ export default class TouchListener extends XEvent<typeof eventList> {
       } else if (touches.length === 2) {
         this.touchType = TOUCH_TYPE.DOUBLE_TOUCH;
         this.curTouch = [
-          { x: touch0.clientX, y: touch0.clientX },
-          { x: touch1.clientY, y: touch1.clientY }
+          { x: touch0.clientX, y: touch0.clientY },
+          { x: touch1.clientX, y: touch1.clientY }
         ];
       }
     }, 100);
@@ -74,20 +75,33 @@ export default class TouchListener extends XEvent<typeof eventList> {
     if (this.curTouch) {
       const { touches } = e as TouchEvent;
       const touch0 = touches[0];
-      // const touch1 = e.touches[1];
+      const touch1 = touches[1];
       if (this.touchType === TOUCH_TYPE.SINGLE_TOUCH && touch0) {
-        const diffX = touch0.clientX - this.curTouch[0].x;
-        const diffY = touch0.clientY - this.curTouch[0].y;
         this.emit('touchMove', {
-          diffX,
-          diffY,
-          x: touch0.clientX - this.offsetLeft,
-          y: touch0.clientY - this.offsetTop,
-          preX: this.curTouch[0].x - this.offsetLeft,
-          preY: this.curTouch[0].y - this.offsetTop,
+          touches: [
+            { x: touch0.clientX - this.offsetLeft, y: touch0.clientY - this.offsetTop },
+          ],
+          preTouches: [
+            { x: this.curTouch[0].x - this.offsetLeft, y: this.curTouch[0].y - this.offsetTop },
+          ]
         });
         this.curTouch[0].x = touch0.clientX;
         this.curTouch[0].y = touch0.clientY;
+      } else if (this.touchType === TOUCH_TYPE.DOUBLE_TOUCH && touch0 && touch1) {
+        this.emit('touchMove', {
+          touches: [
+            { x: touch0.clientX - this.offsetLeft, y: touch0.clientY - this.offsetTop },
+            { x: touch1.clientX - this.offsetLeft, y: touch1.clientY - this.offsetTop }
+          ],
+          preTouches: [
+            { x: this.curTouch[0].x - this.offsetLeft, y: this.curTouch[0].y - this.offsetTop },
+            { x: this.curTouch[1].x - this.offsetLeft, y: this.curTouch[1].y - this.offsetTop },
+          ]
+        });
+        this.curTouch[0].x = touch0.clientX;
+        this.curTouch[0].y = touch0.clientY;
+        this.curTouch[1].x = touch1.clientX;
+        this.curTouch[1].y = touch1.clientY;
       }
     }
   }

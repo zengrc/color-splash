@@ -13,7 +13,7 @@
         涂灰
       </div>
       <div class="btn" @click="switchMode(SPLASH_MODE.MOVE)" :class="{ actived: mode === SPLASH_MODE.MOVE }">
-        移动图片
+        移动/缩放
       </div>
       <div class="btn" @click="onSave">
         保存
