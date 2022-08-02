@@ -342,19 +342,22 @@ const initWebgl = (canvas: HTMLCanvasElement): Splash | undefined => {
     }
   });
 
-  touchListener.on('touchEnd', ({ x, y }) => {
-    if (mode !== SPLASH_MODE.MOVE) {
+  touchListener.on('touchEnd', ({ touches }) => {
+    if (mode !== SPLASH_MODE.MOVE && touchListener.touchType === touchListener.TOUCH_TYPE.SINGLE_TOUCH) {
+      const { x, y } = touches[0];
       updateDraw();
       previewDraw({ x, y });
-    } else {
+    } else if (mode === SPLASH_MODE.MOVE && touchListener.touchType === touchListener.TOUCH_TYPE.DOUBLE_TOUCH) {
       let tempScale = scale;
       if (scale > maxScale) tempScale = maxScale;
       else if (scale < minScale) tempScale = minScale;
       if (scale !== tempScale) {
         const diffScale = +(tempScale / scale).toFixed(2);
         scale = tempScale;
-        translate.x = diffScale * (translate.x - x) + x;
-        translate.y = diffScale * (translate.y - y) + y;
+        const centerX = (touches[0].x + touches[1].x) / 2;
+        const centerY = (touches[0].y + touches[1].y) / 2;
+        translate.x = diffScale * (translate.x - centerX) + centerX;
+        translate.y = diffScale * (translate.y - centerY) + centerY;
         updateDraw();
       }
     }

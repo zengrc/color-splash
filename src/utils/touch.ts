@@ -110,8 +110,10 @@ export default class TouchListener extends XEvent<typeof eventList> {
     e.preventDefault()
     if (this.curTouch) {
       this.emit('touchEnd', {
-        x: this.curTouch[0].x - this.offsetLeft,
-        y: this.curTouch[0].y - this.offsetTop
+        touches: [
+          { x: this.curTouch[0].x - this.offsetLeft, y: this.curTouch[0].y - this.offsetTop },
+          { x: this.curTouch[1].x - this.offsetLeft, y: this.curTouch[1].y - this.offsetTop },
+        ]
       });
     }
   }
